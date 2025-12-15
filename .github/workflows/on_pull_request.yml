@@ -15,7 +15,7 @@ jobs:
             - name: Validate required secrets
               run: |
                 missing=0 for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION S3_ANALYZE_BUCKET; 
-                do if [ -z "${{ secrets[$v] }}" ]; 
+                do if [ run: echo "$V" # shell uses $V ]; 
                 then echo "Missing secret: $v" missing=1 
                 fi done 
                 if [ $missing -eq 1 ]; 
