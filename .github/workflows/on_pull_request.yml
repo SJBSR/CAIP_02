@@ -21,10 +21,10 @@ jobs:
                 AWS_REGION: ${{ secrets.AWS_REGION }} 
                 S3_ANALYZE_BUCKET: ${{ secrets.S3_ANALYZE_BUCKET }} 
               run: | 
-                    set -x missing=0; 
+                    missing=0
                     for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION S3_ANALYZE_BUCKET; 
-                    do if [ -z "${!v}" ]; then echo "Missing secret: $v" missing=1 fi done
-                    if [ "$missing" -eq 1 ]; then echo "Required secrets are not set. Exiting." exit 1 fi
+                    do if [ -z "${!v}" ]; then echo "Missing secret: $v"; missing=1; fi; done
+                    if [ "$missing" -eq 1 ]; then echo "Required secrets are not set. Exiting."; exit 1; fi
             
             - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@v2 
