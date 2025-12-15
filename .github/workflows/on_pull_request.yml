@@ -1,0 +1,29 @@
+name: Analyze Images on Pull Request
+
+on:
+    pull_request:
+        branches:
+            - main
+
+jobs:
+    upload:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v2
+
+            - name: Upload Images to S3
+              run: |
+                echo "Beginning images upload to S3 bucket."
+                # Check if the image directory exists and contains the correct file format.
+                if [ -d images ] && [ "$(find images -type f \( -name '*.jpg' -o -name '*.png' -o -name '*.gif' -o -name '*.webp'))"]; then
+                    upload_output=$(aws s3 cp images/ s3://${{ secrets.S3_ANALYZE_BUCKET }}/rekognition-input/beta --recursive)
+                    echo "Upload output: $upload_output"
+                    echo "The images have been successfully uploaded to S3."
+                else
+                    echo "No supported images found in the directory. Skipping upload."
+                break
+                env:
+                    AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                    AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+                    AWS_REGION: ${{ secrets.AWS_REGION }}
