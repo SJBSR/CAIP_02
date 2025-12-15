@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AcmeLabs Image Analyzer with S3, Lambda, and DynamoDB
+
+Parameters:
+  AccountId:
+    Type: String
+    Description: The AWS Account ID where the resources will be created.
+
+  Region:
+    Type: String
+    Default: us-east-1
+    Description: The AWS Region where the resources will be created.
+
+  S3LambdaBucket:
+    Type: String
+    Default: acmelabs-lambdas
+    Description: The S3 bucket where the Lambda function packages are stored.
+
+  S3ImageAnalyzerBucket:
+    Type: String
+    Default: acmelabs-image-analyzer
+    Description: The S3 bucket for storing images to be analyzed.
+
+  BetaDynamoDBTableName:
+    Type: String
+    Default: acmelabs_image_analyzer_beta_results
+    Description: The name of the DynamoDB table for Beta results.
+
+  ProdDynamoDBTableName:
+    Type: String
+    Default: acmelabs_image_analyzer_prod_results
+    Description: The name of the DynamoDB table for Prod results.
+
+  BetaLambdaFunctionName:
+    Type: String
+    Default: acmelabs_image_analyzer_beta
+    Description: The name of the Lambda function for Beta processing.
+
+  ProdLambdaFunctionName:
+    Type: String
+    Default: acmelabs_image_analyzer_prod
+    Description: The name of the Lambda function for Beta processing.
+
+Resources:
+  # DynamoDB Table for Beta Results
+  AcmeLabsImageAnalyzerBetaResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref BetaDynamoDBTableName
+      AttributeDefinitions:
+        - AttributeName: filename
+          AttributeType: S
+      KeySchema:
+        - AttributeName: filename
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  # DynamoDB Table for Prod Results
+  AcmeLabsImageAnalyzerProdResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Ref ProdDynamoDBTableName
+      AttributeDefinitions:
+        - AttributeName: filename
+          AttributeType: S
+      KeySchema:
+        - AttributeName: filename
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+
+  # IAM Role for Lambda Functions
+  AcmeLabsImageAnalyzerLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: AcmeLabsImageAnalyzerLambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AcmeLabsImageAnalyzerLambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - lambda:InvokeFunction
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${S3ImageAnalyzerBucket}/*"
+                  - !Sub "arn:aws:lambda:${Region}:${AccountId}:function:${BetaLambdaFunctionName}"
+                  - !Sub "arn:aws:lambda:${Region}:${AccountId}:function:${ProdLambdaFunctionName}"
+                  - !Sub "arn:aws:dynamodb:*:*:table/${BetaDynamoDBTableName}"
+                  - !Sub "arn:aws:dynamodb:*:*:table/${ProdDynamoDBTableName}"
+                  - !Sub "arn:aws:logs:${Region}:${AccountId}:log-group:/aws/lambda/${BetaLambdaFunctionName}"
+                  - !Sub "arn:aws:logs:us-east-1:047719623795:log-group:/aws/lambda/*"
+
+  # IAM Policy for Rekognition DetectLabels
+  RekognitionDetectLabelsPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: RekognitionDetectLabelsPolicy
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - rekognition:DetectLabels
+            Resource: '*'
+      Roles:
+        - AcmeLabsImageAnalyzerLambdaExecutionRole
+    DependsOn:
+      - AcmeLabsImageAnalyzerLambdaExecutionRole
+
+  # Lambda Function for Beta Processing
+  AcmeLabsImageAnalyzerLambdaFunctionBeta:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref BetaLambdaFunctionName
+      Handler: beta.lambda_handler
+      Role: !GetAtt AcmeLabsImageAnalyzerLambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref S3LambdaBucket
+        S3Key: acmelabs-imageanalyzer/beta.zip
+      Runtime: python3.13
+      Timeout: 30
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref BetaDynamoDBTableName
+
+  # Lambda Function for Prod Processing
+  AcmeLabsImageAnalyzerLambdaFunctionProd:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref ProdLambdaFunctionName
+      Handler: prod.lambda_handler
+      Role: !GetAtt AcmeLabsImageAnalyzerLambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref S3LambdaBucket
+        S3Key: acmelabs-imageanalyzer/prod.zip
+      Runtime: python3.13
+      Timeout: 30
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref ProdDynamoDBTableName
+
+  # Add permissions for S3 to invoke the Beta Lambda function
+  AcmeLabsImageAnalyzerLambdaPermissionBeta:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AcmeLabsImageAnalyzerLambdaFunctionBeta
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:s3:::${S3ImageAnalyzerBucket}"
+    DependsOn:
+      - AcmeLabsImageAnalyzerLambdaFunctionBeta
+
+  # Add permissions for S3 to invoke the Prod Lambda function
+  AcmeLabsImageAnalyzerLambdaPermissionProd:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AcmeLabsImageAnalyzerLambdaFunctionProd
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Sub "arn:aws:s3:::${S3ImageAnalyzerBucket}"
+    DependsOn:
+      - AcmeLabsImageAnalyzerLambdaFunctionProd
+
+  # S3 Bucket for storing images
+  AcmeLabsImageAnalyzerS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref S3ImageAnalyzerBucket
+
+Outputs:
+  S3ImageAnalyzerBucketName:
+    Description: "S3 Bucket Name for Image Analysis"
+    Value: !Ref S3ImageAnalyzerBucket
+
+  BetaDynamoDBTableName:
+    Description: "Beta DynamoDB Table Name"
+    Value: !Ref AcmeLabsImageAnalyzerBetaResultsTable
+
+  ProdDynamoDBTableName:
+    Description: "Prod DynamoDB Table Name"
+    Value: !Ref AcmeLabsImageAnalyzerProdResultsTable
+
+  LambdaFunctionBetaArn:
+    Description: "ARN of the Beta Lambda Function"
+    Value: !GetAtt AcmeLabsImageAnalyzerLambdaFunctionBeta.Arn
+
+  LambdaFunctionProdArn:
+    Description: "ARN of the Prod Lambda Function"
+    Value: !GetAtt AcmeLabsImageAnalyzerLambdaFunctionProd.Arn
