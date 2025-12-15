@@ -25,7 +25,7 @@ jobs:
           echo "The S3 Bucket has been created successfully"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Package Lambda Functions
@@ -56,7 +56,7 @@ jobs:
           echo "CloudFormation stack has been successfully deploayed."
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
 
       - name: Update S3 Bucket Notification Configuration
@@ -98,7 +98,7 @@ jobs:
           echo "S3 bucket notification configuration has been successfully updated."
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION }}
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
 
@@ -108,7 +108,7 @@ jobs:
           echo "Checking images to upload..."
           if [ -d images ] && [ "$(find images -type f \( -name '*.jpg' -o -name '*.jpeg' -o -name '*.png' -o -name '*.gif' -o -name '*.bmp' -o -name '*.tiff' -o -name '*.tif' -o -name '*.webp' \))" ]; then
             echo "Uploading images to the S3 bucket for processing..."
-            upload_images_output=$(aws s3 cp images/ s3://${{ secrets.S3_IMAGE_ANALYZER_BUCKET }}/rekognition-input/prod/ --recursive)
+            upload_images_output=$(aws s3 cp images/ s3://${{ secrets.S3_ANALYZE_BUCKET }}/rekognition-input/prod/ --recursive)
             echo "Image upload output: $upload_images_output"
             echo "Images uploaded successfully."
           else
