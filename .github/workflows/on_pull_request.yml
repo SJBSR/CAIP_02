@@ -12,14 +12,25 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v2
 
-            - name: Validate required secrets
+            - name: Check required secrets
+              shell: bash
+              env:
+                AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                AWS_REGION: ${{ secrets.AWS_REGION }}
+                S3_ANALYZE_BUCKET: ${{ secrets.S3_ANALYZE_BUCKET }}
               run: |
-                missing=0 for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION S3_ANALYZE_BUCKET; 
-                do if [ run: echo "$V" # shell uses $V ]; 
-                then echo "Missing secret: $v" missing=1 
-                fi done 
-                if [ $missing -eq 1 ]; 
-                then echo "Required secrets are not set. Exiting." exit 1 
+                missing=0
+                for v in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION S3_ANALYZE_BUCKET; do
+                  if [ -z "${!v}" ]; then
+                    echo "Missing secret: $v"
+                    missing=1
+                  fi
+                done
+            
+                if [ "$missing" -eq 1 ]; then
+                  echo "Required secrets are not set. Exiting."
+                  exit 1
                 fi
             
             - name: Configure AWS credentials
